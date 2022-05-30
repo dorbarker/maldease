@@ -202,11 +202,9 @@ get_intensity_table <- function(peaks, noise, spectra, samples) {
     cur_noise <-
       noise[[n]] %>%
       as_tibble() %>%
-      # rename(noise = intensity) %>%
       transmute(sample = n, noise = intensity) %>%
-      sample_n(1)
+      sample_n(1) # noise is the same for every mass
       
-
     noises <- bind_rows(noises, cur_noise)
 
   }
@@ -215,6 +213,8 @@ get_intensity_table <- function(peaks, noise, spectra, samples) {
     intensity_table %>% 
     left_join(noises) %>% 
     mutate(snr = intensity / noise)
+  
+  intensity_table_with_snr
 }
 
 write_output <- function(spectra, peaks, noise) {
