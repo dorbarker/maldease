@@ -1,11 +1,10 @@
 #!/usr/bin/env Rscript
-
 # Ensure proper setup
 installed <- installed.packages()[, 1]
 # as of 2022-05-27, this is needed for patched version of
 # readBrukerFlexData::readBrukerFlexData
 
-if (! "readBrukerFlexData" %in% installed) {
+if (!"readBrukerFlexData" %in% installed) {
   cat("Seting up readBruckerFlexData\n")
   if (!"remotes" %in% installed) {
     install.packages("remotes", repos = "https://cran.r-project.org")
@@ -14,17 +13,19 @@ if (! "readBrukerFlexData" %in% installed) {
 }
 library("readBrukerFlexData")
 
-for (pkg in c("MALDIquant",
-              "MALDIquantForeign",
-              "optparse",
-              "magrittr",
-              "readr",
-              "purrr",
-              "tibble",
-              "tidyr",
-              "dplyr",
-              "ggplot2",
-              "writexl")) {
+for (pkg in c(
+  "MALDIquant",
+  "MALDIquantForeign",
+  "optparse",
+  "magrittr",
+  "readr",
+  "purrr",
+  "tibble",
+  "tidyr",
+  "dplyr",
+  "ggplot2",
+  "writexl"
+)) {
   if (!pkg %in% installed) {
     cat("Installing", pkg, "\n")
     install.packages(pkg, repos = "https://cran.r-project.org")
@@ -49,12 +50,14 @@ arguments <- function() {
     add_option("--max-mass",
                metavar = "NUMBER",
                default = Inf,
-               help = "Maximum mass to include in analysis [Inf]") %>%
-    add_option("--half-window-size",
-               type="integer",
-               default=20,
-               metavar="INT",
-               help = "Half-window size for smoothing interval [20]")
+               help = "Maximum mass to include in analysis [Inf]") %>% 
+    add_option(
+      "--half-window-size",
+      type = "integer",
+      default = 20,
+      metavar = "INT",
+      help = "Half-window size for smoothing interval [20]"
+    )
 
   args <- parse_args2(parser)
 
@@ -78,15 +81,19 @@ arguments <- function() {
 main <- function() {
   args <- arguments()$options
 
-  spectra <- load_spectra(args$input, args$min_mass, args$max_mass, FALSE)
+  spectra <-
+    load_spectra(args$input, args$min_mass, args$max_mass, FALSE)
 
-  normalized_spectra <- preprocess_spectra(spectra, args$half_window_size)
-  samples_avgSpectra <- average_technical_replicates(normalized_spectra)
+  normalized_spectra <-
+    preprocess_spectra(spectra, args$half_window_size)
+  samples_avgSpectra <-
+    average_technical_replicates(normalized_spectra)
 
   samples <- samples_avgSpectra$sample_names
   avg_spectra <- samples_avgSpectra$avg_spectra
 
-  peaks_noise <- peak_detection_spectra(avg_spectra, 3, args$half_window_size)
+  peaks_noise <-
+    peak_detection_spectra(avg_spectra, 3, args$half_window_size)
 
   intensity_table <- get_intensity_table(avg_spectra,
                                          peaks_noise$peaks,
@@ -98,44 +105,47 @@ main <- function() {
 
 }
 
-load_spectra <- function(results_path, min_mass, max_mass, verbose) {
-
-  spectra <-
-    if (verbose) {
-      MALDIquantForeign::import(results_path,
-                                massRange = c(min_mass, max_mass))
-    } else {
-      suppressWarnings({
+load_spectra <-
+  function(results_path, min_mass, max_mass, verbose) {
+    spectra <-
+      if (verbose) {
         MALDIquantForeign::import(results_path,
                                   massRange = c(min_mass, max_mass))
-      })
+      } else {
+        suppressWarnings({
+          MALDIquantForeign::import(results_path,
+                                    massRange = c(min_mass, max_mass))
+        })
+      }
+
+
+    non_empty <-
+      spectra %>%
+      map_lgl(isEmpty) %>%
+      all() %>%
+      not()
+
+    regular <-
+      spectra %>%
+      map_lgl(isRegular)
+
+    if ((!non_empty) && regular) {
+      cat("Input data are malformed\n")
+      quit(save = "no", status = 1)
     }
 
-
-  non_empty <-
-    spectra %>%
-    map_lgl(isEmpty) %>%
-    all() %>%
-    not()
-
-  regular <-
-    spectra %>%
-    map_lgl(isRegular)
-
-  if ((!non_empty) && regular) {
-    cat("Input data are malformed\n")
-    quit(save = "no", status = 1)
+    spectra
   }
 
-  spectra
-}
-
 preprocess_spectra <- function(spectra, half_window_size) {
-
   transformed_spectra <-
     spectra %>%
-    transformIntensity(method = "sqrt") %>%
-    smoothIntensity(method = "SavitzkyGolay", halfWindowSize = half_window_size)
+    # transformIntensity(method = "sqrt") %>%
+    suppressWarnings({
+      smoothIntensity(., method = "SavitzkyGolay",
+                      halfWindowSize = half_window_size)
+    })
+
 
   baseline_estimates <-
     map(transformed_spectra, function(spectrum) {
@@ -155,7 +165,6 @@ preprocess_spectra <- function(spectra, half_window_size) {
 }
 
 average_technical_replicates <- function(spectra) {
-
   samples <-
     factor(map_chr(spectra, function(x) {
       metaData(x)$sampleName
@@ -164,57 +173,64 @@ average_technical_replicates <- function(spectra) {
   avg_spectra <-
     averageMassSpectra(spectra, labels = samples, method = "mean")
 
-  list("sample_names" = map_chr(avg_spectra, ~ metaData(.x)$sampleName),
-       "avg_spectra" = avg_spectra)
+  list(
+    "sample_names" = map_chr(avg_spectra, ~ metaData(.x)$sampleName),
+    "avg_spectra" = avg_spectra
+  )
 }
 
-peak_detection_spectrum <- function(spectrum, signal_to_noise_ratio, half_window_size) {
+peak_detection_spectrum <-
+  function(spectrum,
+           signal_to_noise_ratio,
+           half_window_size) {
+    peaks <-
+      spectrum %>%
+      detectPeaks(method = "SuperSmoother",
+                  halfWindowSize = half_window_size,
+                  SNR = signal_to_noise_ratio) %>%
+      binPeaks(tolerance = 0.002) %>%
+      filterPeaks(minFrequency = 0.25)
 
-  peaks <-
-    spectrum %>%
-    detectPeaks(method = "SuperSmoother",
-                halfWindowSize = half_window_size,
-                SNR = signal_to_noise_ratio) %>%
-    binPeaks(tolerance = 0.002) %>%
-    filterPeaks(minFrequency = 0.25)
+    peaks
+  }
 
-  peaks
-}
+peak_detection_spectra <-
+  function(spectra,
+           signal_to_noise_ratio,
+           half_window_size) {
+    noises <- map(spectra, ~ estimateNoise(.x, method = "SuperSmoother"))
+    #peaks <- map(spectra, ~ peak_detection_spectrum(.x, signal_to_noise_ratio))
+    peaks <-
+      detectPeaks(spectra,
+                  method = "SuperSmoother",
+                  halfWindowSize = half_window_size,
+                  SNR = signal_to_noise_ratio) %>%
+      binPeaks(tolerance = 0.002) %>%
+      filterPeaks(minFrequency = 0.25)
 
-peak_detection_spectra <- function(spectra, signal_to_noise_ratio, half_window_size) {
-
-  noises <- map(spectra, ~ estimateNoise(.x, method="SuperSmoother"))
-  #peaks <- map(spectra, ~ peak_detection_spectrum(.x, signal_to_noise_ratio))
-  peaks <-
-    detectPeaks(spectra,
-                method = "SuperSmoother",
-                halfWindowSize = half_window_size,
-                SNR = signal_to_noise_ratio) %>%
-    binPeaks(tolerance = 0.002) %>%
-    filterPeaks(minFrequency = 0.25)
-
-  list("noise" = noises, "peaks" = peaks)
-}
+    list("noise" = noises, "peaks" = peaks)
+  }
 
 get_intensity_table <- function(spectra, peaks, samples) {
-
   m <- intensityMatrix(peaks, spectra)
   mz <- attr(m, "mass")
 
   mass_snr <-
     map_dfr(peaks,
-             ~ tibble(sample = .x@metaData$sampleName,
-                      mass = .x@mass,
-                      snr = .x@snr))
+            ~ tibble(
+              sample = .x@metaData$sampleName,
+              mass = .x@mass,
+              snr = .x@snr
+            ))
   intensity_table <-
     t(m) %>%
-    as_tibble() %>%
+    as_tibble(.name_repair = "minimal") %>%
     set_colnames(samples) %>%
     mutate(mass = mz) %>%
     pivot_longer(-mass,
                  names_to = "sample",
                  values_to = "intensity") %>%
-    left_join(mass_snr) %>%
+    left_join(mass_snr, by = c("mass", "sample")) %>%
     mutate(noise = intensity / snr) %>%
     drop_na()
 
@@ -222,14 +238,15 @@ get_intensity_table <- function(spectra, peaks, samples) {
 }
 
 draw_plots <- function(spectra, peaks) {
-
   peak_tables <-
-    map_dfr(peaks,
-            ~ tibble(
-              sample = .x@metaData$sampleName,
-              mass = .x@mass,
-              peak_intensity = .x@intensity
-            ))
+    map_dfr(
+      peaks,
+      ~ tibble(
+        sample = .x@metaData$sampleName,
+        mass = .x@mass,
+        peak_intensity = .x@intensity
+      )
+    )
 
   spectrum_tables <- imap_dfr(spectra,
                               ~ tibble(
@@ -241,36 +258,38 @@ draw_plots <- function(spectra, peaks) {
   p <-
     ggplot(spectrum_tables, aes(x = mass, y = intensity)) +
     geom_line() +
-    geom_point(data = peak_tables,
-               aes(x = mass, y = peak_intensity),
-               shape = 4,
-               colour = "red") +
-    facet_wrap(~ sample,
-               ncol = 1,
-               scales = "fixed") +
+    geom_point(
+      data = peak_tables,
+      aes(x = mass, y = peak_intensity),
+      shape = 4,
+      colour = "red"
+    ) +
+    labs(title = Sys.time()) +
+    facet_wrap( ~ sample,
+                ncol = 1,
+                scales = "fixed") +
     theme_linedraw()
 
   p
 }
 
 write_output <- function(spectrum_plot, intensity_table, outpath) {
-  
-  if (! dir.exists(outpath)) {
+  if (!dir.exists(outpath)) {
     dir.create(outpath)
   }
 
   plot_path <- file.path(outpath, "mass_spectrum.png")
   table_path <- file.path(outpath, "intensity_table.tsv")
   excel_path <- file.path(outpath, "intensity_table.xlsx")
-  
+
   ggsave(
     filename = plot_path,
     plot = spectrum_plot,
-    height = 800,
-    width = 1200,
-    units = "px"
+    height = 15,
+    width = 30,
+    units = "cm"
   )
-  
+
   write_tsv(intensity_table, table_path)
   write_xlsx(intensity_table, excel_path)
 }
