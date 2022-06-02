@@ -20,6 +20,7 @@ for (pkg in c(
   "magrittr",
   "readr",
   "purrr",
+  "here",
   "stringr",
   "tibble",
   "tidyr",
@@ -78,6 +79,11 @@ arguments <- function() {
       dest = "include_only_str",
       type = "character",
       metavar = "RANGES"
+    ) %>% add_option(
+      "--definitions",
+      type = "character",
+      metavar= "FILE",
+      help = "Path to additional definitions for peak calling"
     )
 
   args <- parse_args2(parser)
@@ -163,6 +169,28 @@ load_spectra <- function(results_path, min_mass, max_mass, verbose) {
 
     spectra
   }
+
+load_definitions <- function(additional_path) {
+
+  # definition file format (no headers, comma-delimited):
+  # name1,mass,mass_tolerance
+  # name1,mass,mass_tolerance
+  # name2,mass,mass_tolerance
+  # etc
+
+  definitions_files <-
+    here("data") %>%
+    list.files(full.names = TRUE)
+
+  if (!is.null(additional_path)) {
+    definitions_files <- c(definitions_files, additional_path)
+  }
+
+  definitions <-
+    definitions_files %>% map_dfr( ~ read_csv(.x, col_names = FALSE))
+
+  definitions
+}
 
 preprocess_spectra <- function(spectra, half_window_size) {
   transformed_spectra <-
