@@ -78,13 +78,15 @@ arguments <- function() {
       default = "0-Inf",
       dest = "include_only_str",
       type = "character",
-      metavar = "RANGES"
-    ) %>% add_option(
-      "--definitions",
-      type = "character",
-      metavar= "FILE",
-      help = "Path to additional definitions for peak calling"
-    )
+      metavar = "RANGES",
+      help = "Consider only these mass ranges for peak reporting. \
+              Lower and upper bounds are inclusive and separated by a dash. \
+              Multiple ranges can be specified and are commas-delimited. \
+              e.g. `--include-only '123-456,1000-2000'`"
+    ) %>% add_option("--definitions",
+                     type = "character",
+                     metavar = "FILE",
+                     help = "Path to additional definitions for peak calling")
 
   args <- parse_args2(parser)
 
