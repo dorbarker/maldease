@@ -105,8 +105,7 @@ main <- function() {
 
 }
 
-load_spectra <-
-  function(results_path, min_mass, max_mass, verbose) {
+load_spectra <- function(results_path, min_mass, max_mass, verbose) {
     spectra <-
       if (verbose) {
         MALDIquantForeign::import(results_path,
@@ -179,10 +178,9 @@ average_technical_replicates <- function(spectra) {
   )
 }
 
-peak_detection_spectrum <-
-  function(spectrum,
-           signal_to_noise_ratio,
-           half_window_size) {
+peak_detection_spectrum <-  function(spectrum,
+                                     signal_to_noise_ratio,
+                                     half_window_size) {
     peaks <-
       spectrum %>%
       detectPeaks(method = "SuperSmoother",
@@ -194,12 +192,11 @@ peak_detection_spectrum <-
     peaks
   }
 
-peak_detection_spectra <-
-  function(spectra,
-           signal_to_noise_ratio,
-           half_window_size) {
+peak_detection_spectra <- function(spectra, 
+                                   signal_to_noise_ratio, 
+                                   half_window_size) {
     noises <- map(spectra, ~ estimateNoise(.x, method = "SuperSmoother"))
-    #peaks <- map(spectra, ~ peak_detection_spectrum(.x, signal_to_noise_ratio))
+
     peaks <-
       detectPeaks(spectra,
                   method = "SuperSmoother",
@@ -252,8 +249,8 @@ draw_plots <- function(spectra, peaks) {
                               ~ tibble(
                                 sample = .y,
                                 mass = .x@mass,
-                                intensity = .x@intensity
-                              ))
+                                intensity = .x@intensity)
+                              )
 
   p <-
     ggplot(spectrum_tables, aes(x = mass, y = intensity)) +
