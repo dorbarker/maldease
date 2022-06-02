@@ -74,7 +74,7 @@ arguments <- function() {
     )  %>%
     add_option(
       "--include-only",
-      default = "0-999999",
+      default = "0-Inf",
       dest = "include_only_str",
       type = "character",
       metavar = "RANGES"
@@ -102,7 +102,11 @@ arguments <- function() {
 }
 
 main <- function() {
+
   args <- arguments()$options
+
+  analysis_time <- Sys.time()
+  analysis_params <- format_analysis_parameters(args, analysis_time)
 
   spectra <-
     load_spectra(args$input, args$min_mass, args$max_mass, FALSE)
@@ -123,9 +127,9 @@ main <- function() {
                                          samples,
                                          args$include_only)
 
-  spectrum_plot <- draw_plots(avg_spectra, peaks_noise$peaks, args$include_only)
+  spectrum_plot <- draw_plots(avg_spectra, peaks_noise$peaks, args$include_only, analysis_time)
 
-  write_output(spectrum_plot, intensity_table, args$output)
+  write_output(spectrum_plot, intensity_table, analysis_params, args$output)
 
 }
 
@@ -265,7 +269,7 @@ get_intensity_table <- function(spectra, peaks, samples, incl_ranges) {
   intensity_table
 }
 
-draw_plots <- function(spectra, peaks, incl_ranges) {
+draw_plots <- function(spectra, peaks, incl_ranges, analysis_time) {
 
   peak_tables <-
     map_dfr(
@@ -294,7 +298,7 @@ draw_plots <- function(spectra, peaks, incl_ranges) {
       shape = 4,
       colour = "red"
     ) +
-    labs(title = Sys.time()) +
+    labs(title = analysis_time) +
     facet_wrap( ~ sample,
                 ncol = 1,
                 scales = "fixed") +
@@ -303,7 +307,17 @@ draw_plots <- function(spectra, peaks, incl_ranges) {
   p
 }
 
-write_output <- function(spectrum_plot, intensity_table, outpath) {
+format_analysis_parameters <- function(arg, analysis_time) {
+
+  analysis_time_str <- paste("analysis_time", analysis_time, sep = ": ")
+  cli_args <- paste(names(arg), arg, sep = ": ", collapse = "\n")
+
+  analysis_parameters_log <- paste(analysis_time_str, cli_args, "", sep = "\n")
+
+  analysis_parameters_log
+}
+
+write_output <- function(spectrum_plot, intensity_table, params, outpath) {
   if (!dir.exists(outpath)) {
     dir.create(outpath)
   }
@@ -311,6 +325,7 @@ write_output <- function(spectrum_plot, intensity_table, outpath) {
   plot_path <- file.path(outpath, "mass_spectrum.png")
   table_path <- file.path(outpath, "intensity_table.tsv")
   excel_path <- file.path(outpath, "intensity_table.xlsx")
+  params_path <- file.path(outpath, "params.txt")
 
   ggsave(
     filename = plot_path,
@@ -322,6 +337,7 @@ write_output <- function(spectrum_plot, intensity_table, outpath) {
 
   write_tsv(intensity_table, table_path)
   write_xlsx(intensity_table, excel_path)
+  write_lines(params, params_path)
 }
 
 main()
