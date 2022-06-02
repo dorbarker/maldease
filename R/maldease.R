@@ -83,12 +83,22 @@ arguments <- function() {
               Lower and upper bounds are inclusive and separated by a dash. \
               Multiple ranges can be specified and are commas-delimited. \
               e.g. `--include-only '123-456,1000-2000'`"
-    ) %>% add_option("--definitions",
-                     type = "character",
-                     metavar = "FILE",
-                     help = "Path to additional definitions for peak calling")
+    ) %>%
+    add_option("--definitions",
+               type = "character",
+               metavar = "FILE",
+               help = "Path to additional definitions for peak calling") %>%
+    add_option(c("-v", "--version"),
+               action = "store_true",
+               help = "Print the version and exit")
+
 
   args <- parse_args2(parser)
+
+  if (args$option$version) {
+    cat(paste("maldease", get_version()), "\n")
+    quit(save = "no", status = 0)
+  }
 
   args$options$include_only <- parse_range(args$options$include_only_str)
 
@@ -139,6 +149,17 @@ main <- function() {
 
   write_output(spectrum_plot, intensity_table, analysis_params, args$output)
 
+}
+
+get_version <- function() {
+  version <-
+    read_lines(here("DESCRIPTION")) %>%
+    keep(~ grepl("Version", .x)) %>%
+    str_split(": ") %>%
+    unlist() %>%
+    .[2]
+
+  version
 }
 
 load_spectra <- function(results_path, min_mass, max_mass, verbose) {
