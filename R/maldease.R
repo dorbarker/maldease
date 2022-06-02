@@ -20,6 +20,7 @@ for (pkg in c(
   "magrittr",
   "readr",
   "purrr",
+  "stringr",
   "tibble",
   "tidyr",
   "dplyr",
@@ -35,6 +36,19 @@ for (pkg in c(
 
 
 arguments <- function() {
+
+  parse_range <- function(range_str) {
+
+    parsed_ranges <-
+      range_str %>%
+      str_split("\\s*,\\s*", simplify = TRUE) %>%
+      str_split("-") %>%
+      map(as.double) %>%
+      map(sort)
+
+    parsed_ranges
+  }
+
   parser <-
     OptionParser() %>%
     add_option(c("-i", "--input"),
@@ -50,16 +64,25 @@ arguments <- function() {
     add_option("--max-mass",
                metavar = "NUMBER",
                default = Inf,
-               help = "Maximum mass to include in analysis [Inf]") %>% 
+               help = "Maximum mass to include in analysis [Inf]") %>%
     add_option(
       "--half-window-size",
       type = "integer",
       default = 20,
       metavar = "INT",
       help = "Half-window size for smoothing interval [20]"
+    )  %>%
+    add_option(
+      "--include-only",
+      default = "0-999999",
+      dest = "include_only_str",
+      type = "character",
+      metavar = "RANGES"
     )
 
   args <- parse_args2(parser)
+
+  args$options$include_only <- parse_range(args$options$include_only_str)
 
   is_input_null <- is.null(args$options$input)
   is_output_null <- is.null(args$options$output)
@@ -97,9 +120,10 @@ main <- function() {
 
   intensity_table <- get_intensity_table(avg_spectra,
                                          peaks_noise$peaks,
-                                         samples)
+                                         samples,
+                                         args$include_only)
 
-  spectrum_plot <- draw_plots(avg_spectra, peaks_noise$peaks)
+  spectrum_plot <- draw_plots(avg_spectra, peaks_noise$peaks, args$include_only)
 
   write_output(spectrum_plot, intensity_table, args$output)
 
@@ -192,8 +216,8 @@ peak_detection_spectrum <-  function(spectrum,
     peaks
   }
 
-peak_detection_spectra <- function(spectra, 
-                                   signal_to_noise_ratio, 
+peak_detection_spectra <- function(spectra,
+                                   signal_to_noise_ratio,
                                    half_window_size) {
     noises <- map(spectra, ~ estimateNoise(.x, method = "SuperSmoother"))
 
@@ -208,7 +232,12 @@ peak_detection_spectra <- function(spectra,
     list("noise" = noises, "peaks" = peaks)
   }
 
-get_intensity_table <- function(spectra, peaks, samples) {
+filter_mass_on_ranges <- function(mass_spec_table, incl_ranges) {
+
+  map_dfr(incl_ranges, ~ filter(mass_spec_table, between(mass, .x[1], .x[2])))
+}
+
+get_intensity_table <- function(spectra, peaks, samples, incl_ranges) {
   m <- intensityMatrix(peaks, spectra)
   mz <- attr(m, "mass")
 
@@ -219,6 +248,7 @@ get_intensity_table <- function(spectra, peaks, samples) {
               mass = .x@mass,
               snr = .x@snr
             ))
+
   intensity_table <-
     t(m) %>%
     as_tibble(.name_repair = "minimal") %>%
@@ -229,12 +259,14 @@ get_intensity_table <- function(spectra, peaks, samples) {
                  values_to = "intensity") %>%
     left_join(mass_snr, by = c("mass", "sample")) %>%
     mutate(noise = intensity / snr) %>%
-    drop_na()
+    drop_na() %>%
+    filter_mass_on_ranges(incl_ranges)
 
   intensity_table
 }
 
-draw_plots <- function(spectra, peaks) {
+draw_plots <- function(spectra, peaks, incl_ranges) {
+
   peak_tables <-
     map_dfr(
       peaks,
@@ -243,7 +275,8 @@ draw_plots <- function(spectra, peaks) {
         mass = .x@mass,
         peak_intensity = .x@intensity
       )
-    )
+    ) %>%
+    filter_mass_on_ranges(incl_ranges)
 
   spectrum_tables <- imap_dfr(spectra,
                               ~ tibble(
