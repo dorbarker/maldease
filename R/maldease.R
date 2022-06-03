@@ -90,6 +90,7 @@ arguments <- function() {
                help = "Path to additional definitions for peak calling") %>%
     add_option(c("-v", "--version"),
                action = "store_true",
+               default = FALSE,
                help = "Print the version and exit")
 
 
@@ -129,6 +130,8 @@ main <- function() {
   spectra <-
     load_spectra(args$input, args$min_mass, args$max_mass, FALSE)
 
+  target_definitions <- load_definitions(args$definitions)
+
   normalized_spectra <-
     preprocess_spectra(spectra, args$half_window_size)
   samples_avgSpectra <-
@@ -147,7 +150,9 @@ main <- function() {
 
   spectrum_plot <- draw_plots(avg_spectra, peaks_noise$peaks, args$include_only, analysis_time)
 
-  write_output(spectrum_plot, intensity_table, analysis_params, args$output)
+  calls <- call_positives(intensity_table, target_definitions)
+
+  write_output(spectrum_plot, intensity_table, analysis_params, calls, args$output)
 
 }
 
@@ -210,7 +215,7 @@ load_definitions <- function(additional_path) {
   }
 
   definitions <-
-    definitions_files %>% map_dfr( ~ read_csv(.x, col_names = FALSE))
+    definitions_files %>% map_dfr(~ read_tsv(.x, col_types = "cdd"))
 
   definitions
 }
@@ -236,7 +241,8 @@ preprocess_spectra <- function(spectra, half_window_size) {
     alignSpectra(
       halfWindowSize = half_window_size,
       SNR = 3,
-      tolerance = 0.002,
+      tolerance = 0.02,
+      noiseMethod="SuperSmoother",
       warpingMethod = "lowess"
     )
   normalized_spectra
@@ -265,7 +271,7 @@ peak_detection_spectrum <-  function(spectrum,
       detectPeaks(method = "SuperSmoother",
                   halfWindowSize = half_window_size,
                   SNR = signal_to_noise_ratio) %>%
-      binPeaks(tolerance = 0.002) %>%
+      binPeaks(method="relaxed", tolerance = 0.002) %>%
       filterPeaks(minFrequency = 0.25)
 
     peaks
@@ -278,7 +284,7 @@ peak_detection_spectra <- function(spectra,
 
     peaks <-
       detectPeaks(spectra,
-                  method = "SuperSmoother",
+                  noiseMethod = "SuperSmoother",
                   halfWindowSize = half_window_size,
                   SNR = signal_to_noise_ratio) %>%
       binPeaks(tolerance = 0.002) %>%
@@ -368,7 +374,21 @@ format_analysis_parameters <- function(arg, analysis_time) {
   analysis_parameters_log
 }
 
-write_output <- function(spectrum_plot, intensity_table, params, outpath) {
+call_positives <- function(intensity_table, target_definitions) {
+
+  target_definitions %>%
+    mutate(
+      lower = mass - tolerance,
+      upper = mass + tolerance,
+    ) %>%
+    rowwise() %>%
+    mutate(
+      positive = between(intensity_table$mass, lower, upper) %>% any()
+    ) %>%
+    select(target, mass, positive)
+}
+
+write_output <- function(spectrum_plot, intensity_table, params, calls, outpath) {
   if (!dir.exists(outpath)) {
     dir.create(outpath)
   }
@@ -377,6 +397,7 @@ write_output <- function(spectrum_plot, intensity_table, params, outpath) {
   table_path <- file.path(outpath, "intensity_table.tsv")
   excel_path <- file.path(outpath, "intensity_table.xlsx")
   params_path <- file.path(outpath, "params.txt")
+  calls_path <- file.path(outpath, "calls.tsv")
 
   ggsave(
     filename = plot_path,
@@ -387,6 +408,7 @@ write_output <- function(spectrum_plot, intensity_table, params, outpath) {
   )
 
   write_tsv(intensity_table, table_path)
+  write_tsv(calls, calls_path)
   write_xlsx(intensity_table, excel_path)
   write_lines(params, params_path)
 }
