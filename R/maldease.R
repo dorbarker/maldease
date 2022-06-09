@@ -1,17 +1,4 @@
 #!/usr/bin/env Rscript
-# Ensure proper setup
-installed <- installed.packages()[, 1]
-# as of 2022-05-27, this is needed for patched version of
-# readBrukerFlexData::readBrukerFlexData
-
-if (!"readBrukerFlexData" %in% installed) {
-  cat("Seting up readBruckerFlexData\n")
-  if (!"remotes" %in% installed) {
-    install.packages("remotes", repos = "https://cran.r-project.org")
-  }
-  remotes::install_github("sgibb/readBrukerFlexData@issue3-ctof2calibration")
-}
-library("readBrukerFlexData")
 
 for (pkg in c(
   "MALDIquant",
@@ -28,10 +15,6 @@ for (pkg in c(
   "ggplot2",
   "writexl"
 )) {
-  if (!pkg %in% installed) {
-    cat("Installing", pkg, "\n")
-    install.packages(pkg, repos = "https://cran.r-project.org")
-  }
   suppressPackageStartupMessages(library(pkg, character.only = TRUE))
 }
 
