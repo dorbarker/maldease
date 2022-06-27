@@ -18,6 +18,22 @@ for (pkg in c(
   suppressPackageStartupMessages(library(pkg, character.only = TRUE))
 }
 
+script_loc <-
+    commandArgs(trailingOnly=FALSE) %>%
+    keep(~str_detect(.x, "--file")) %>%
+    str_remove("--file=") %>%
+    tools::file_path_as_absolute()
+
+project_loc <-
+    script_loc %>%
+    str_split(.Platform$file.sep) %>%
+    unlist() %>%
+    `[`(., 1:(length(.)-2)) %>%
+    paste(collapse=.Platform$file.sep)
+
+setwd(project_loc)
+
+suppressMessages(here::i_am("R/maldease.R"))
 
 arguments <- function() {
 
