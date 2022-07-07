@@ -53,7 +53,10 @@ arguments <- function() {
     OptionParser() %>%
     add_option(c("-i", "--input"),
                metavar = "DIRECTORY",
-               help = "Path to raw MALDI results [required]") %>%
+               help = "Path to raw MALDI experimental results [required]") %>%
+    add_option("-n", "--negative-control",
+               metavar = "DIRECTORY",
+               help = "Path to raw MALDI results for negative control") %>%
     add_option(c("-o", "--output"),
                metavar = "DIRECTORY",
                help = "Path to output directory [required]") %>%
