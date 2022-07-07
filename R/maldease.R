@@ -60,14 +60,6 @@ arguments <- function() {
     add_option(c("-o", "--output"),
                metavar = "DIRECTORY",
                help = "Path to output directory [required]") %>%
-    add_option("--min-mass",
-               metavar = "NUMBER",
-               default = 0,
-               help = "Minimum mass to include in analysis [0]") %>%
-    add_option("--max-mass",
-               metavar = "NUMBER",
-               default = Inf,
-               help = "Maximum mass to include in analysis [Inf]") %>%
     add_option(
       "--half-window-size",
       type = "integer",
@@ -130,7 +122,7 @@ main <- function() {
   analysis_params <- format_analysis_parameters(args, analysis_time)
 
   spectra <-
-    load_spectra(args$input, args$min_mass, args$max_mass, FALSE)
+    load_spectra(args$input, FALSE)
 
   target_definitions <- load_definitions(args$definitions)
 
@@ -169,15 +161,13 @@ get_version <- function() {
   version
 }
 
-load_spectra <- function(results_path, min_mass, max_mass, verbose) {
+load_spectra <- function(results_path, verbose) {
     spectra <-
       if (verbose) {
-        MALDIquantForeign::import(results_path,
-                                  massRange = c(min_mass, max_mass))
+        MALDIquantForeign::import(results_path)
       } else {
         suppressWarnings({
-          MALDIquantForeign::import(results_path,
-                                    massRange = c(min_mass, max_mass))
+          MALDIquantForeign::import(results_path)
         })
       }
 
