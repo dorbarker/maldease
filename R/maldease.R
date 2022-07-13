@@ -54,7 +54,7 @@ arguments <- function() {
     add_option(c("-i", "--input"),
                metavar = "DIRECTORY",
                help = "Path to raw MALDI experimental results [required]") %>%
-    add_option("-n", "--negative-control",
+    add_option(c("-n", "--negative-control"),
                metavar = "DIRECTORY",
                help = "Path to raw MALDI results for negative control") %>%
     add_option(c("-o", "--output"),
@@ -122,6 +122,7 @@ main <- function() {
   analysis_params <- format_analysis_parameters(args, analysis_time)
 
   experiment_spectra <- load_spectra(args$input, FALSE)
+
   negative_spectra <- load_spectra(args$negative_control, FALSE)
 
   neg_sample_name <-
@@ -129,6 +130,7 @@ main <- function() {
     unique()
 
   spectra <- c(experiment_spectra, negative_spectra)
+
 
   target_definitions <- load_definitions(args$definitions)
 
@@ -144,6 +146,8 @@ main <- function() {
   peaks_noise <-
     peak_detection_spectra(avg_spectra, 3, args$half_window_size)
 
+  combined_peaks <- combine_peaks_and_call_positives(peaks_noise$peaks,
+                                                     neg_sample_name)
   intensity_table <- get_intensity_table(avg_spectra,
                                          peaks_noise$peaks,
                                          samples,
@@ -151,9 +155,9 @@ main <- function() {
 
   spectrum_plot <- draw_plots(avg_spectra, peaks_noise$peaks, args$include_only, analysis_time)
 
-  calls <- call_positives(intensity_table, target_definitions)
+  calls <- call_positives(combined_peaks, target_definitions, neg_sample_name)
 
-  write_output(spectrum_plot, intensity_table, analysis_params, calls, args$output)
+  write_output(spectrum_plot, combined_peaks, analysis_params, calls, args$output)
 
 }
 
@@ -325,36 +329,41 @@ get_intensity_table <- function(spectra, peaks, samples, incl_ranges) {
   intensity_table
 }
 
-merge_peaks_and_call_positives <- function(peaks, negative_sample_name) {
+combine_peaks_and_call_positives <- function(peaks, negative_sample_name) {
 
   neg_idx <-
     peaks %>%
     map_lgl(~ metaData(.x)$sampleName == negative_sample_name) %>%
     which()
 
-  pos_idx <- if (neg_idx == 1) {2} else {1}
+  exp_idx <- if (neg_idx == 1) {2} else {1}
 
   n <- peaks[[neg_idx]]
-  p <- peaks[[pos_idx]]
+  e <- peaks[[exp_idx]]
+
+  experimental_sample_name <- metaData(e)$sampleName
 
   merged <-
-    data.frame("mass" = p@mass, "p" = p@intensity) %>%
+    data.frame("mass" = e@mass, e = e@intensity) %>%
     full_join(
-      data.frame("mass" = n@mass, "n" = n@intensity)
+      data.frame("mass" = n@mass, n = n@intensity),
+      by = c("mass" = "mass")
     ) %>%
     arrange(mass) %>%
     mutate(
       SNR = case_when(
-        is.na(p) ~ -Inf,
+        is.na(e) ~ 0,
         is.na(n) ~ Inf,
-        TRUE     ~ p / n
+        TRUE     ~ e / n
       ),
-      is_positive = SNR > 3)
+      is_positive = SNR > 3) %>%
+    as_tibble()
+
+  colnames(merged) <- c("mass", experimental_sample_name,
+                        negative_sample_name, "SNR", "is_positive")
 
   merged
-
 }
-
 
 draw_plots <- function(spectra, peaks, incl_ranges, analysis_time) {
 
@@ -404,7 +413,9 @@ format_analysis_parameters <- function(arg, analysis_time) {
   analysis_parameters_log
 }
 
-call_positives <- function(intensity_table, target_definitions) {
+call_positives <- function(intensity_table, target_definitions, negative_sample_name) {
+
+  potential_peaks <- intensity_table %>% filter(is_positive)
 
   target_definitions %>%
     mutate(
@@ -413,7 +424,7 @@ call_positives <- function(intensity_table, target_definitions) {
     ) %>%
     rowwise() %>%
     mutate(
-      positive = between(intensity_table$mass, lower, upper) %>% any()
+      positive = between(potential_peaks$mass, lower, upper) %>% any()
     ) %>%
     select(target, mass, positive)
 }
