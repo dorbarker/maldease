@@ -276,34 +276,6 @@ filter_mass_on_ranges <- function(mass_spec_table, incl_ranges) {
   map_dfr(incl_ranges, ~ filter(mass_spec_table, between(mass, .x[1], .x[2])))
 }
 
-get_intensity_table <- function(spectra, peaks, samples, incl_ranges) {
-  m <- intensityMatrix(peaks, spectra)
-  mz <- attr(m, "mass")
-
-  mass_snr <-
-    map_dfr(peaks,
-            ~ tibble(
-              sample = .x@metaData$sampleName,
-              mass = .x@mass,
-              snr = .x@snr
-            ))
-
-  intensity_table <-
-    t(m) %>%
-    as_tibble(.name_repair = "minimal") %>%
-    set_colnames(samples) %>%
-    mutate(mass = mz) %>%
-    pivot_longer(-mass,
-                 names_to = "sample",
-                 values_to = "intensity") %>%
-    left_join(mass_snr, by = c("mass", "sample")) %>%
-    mutate(noise = intensity / snr) %>%
-    drop_na() %>%
-    filter_mass_on_ranges(incl_ranges)
-
-  intensity_table
-}
-
 combine_peaks_and_call_positives <- function(peaks, negative_sample_name, incl_ranges) {
 
   neg_idx <-
