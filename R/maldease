@@ -7,7 +7,6 @@ for (pkg in c(
   "magrittr",
   "readr",
   "purrr",
-  "here",
   "stringr",
   "tibble",
   "tidyr",
@@ -32,7 +31,7 @@ project_loc <-
     paste(collapse=.Platform$file.sep)
 
 description_path <- file.path(project_loc, "DESCRIPTION")
-# suppressMessages(here::i_am("R/maldease.R"))
+
 arguments <- function() {
 
   parse_range <- function(range_str) {
