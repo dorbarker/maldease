@@ -4,7 +4,6 @@ for (pkg in c(
   "docopt",
   "MALDIquant",
   "MALDIquantForeign",
-  "optparse",
   "magrittr",
   "readr",
   "purrr",
