@@ -47,6 +47,7 @@ arguments <- function() {
 
     parsed_ranges
   }
+
   doc <- "maldease
 
   Usage:
@@ -67,18 +68,17 @@ arguments <- function() {
                                          Multiple ranges can be specified and
                                          are comma delimited,
                                          e.g.--include-only \'123-456,1000-2000\'
+                                         [default: 0-Inf]
     --definitions=<files>...             One or more paths to tab-separated
                                          defintions of target peaks
   "
 
   args <- docopt(doc, version = get_version())
 
-  args[["--include-only"]] <- parse_range(args[["--include_only"]])
+  args[["--include-only"]] <- parse_range(args[["--include-only"]])
 
   # Make numeric arguments the correct type
   args[["--half-window-size"]] <- as.integer(args[["--half-window-size"]])
-
-  print(args)
 
   args
 }
@@ -116,14 +116,13 @@ main <- function() {
     peak_detection_spectra(avg_spectra, 3, args[["--half-window-size"]])
 
   combined_peaks <- combine_peaks_and_call_positives(peaks_noise$peaks,
-                                                     neg_sample_name)
-  intensity_table <- get_intensity_table(avg_spectra,
-                                         peaks_noise$peaks,
-                                         samples,
-                                         args[["--include_only"]])
+                                                     neg_sample_name,
+                                                     args[["--include-only"]])
 
-  spectrum_plot <- draw_plots(avg_spectra, peaks_noise$peaks,
-                              args[["--include_only"]], analysis_time)
+  spectrum_plot <- draw_plots(avg_spectra,
+                              peaks_noise$peaks,
+                              args[["--include-only"]],
+                              analysis_time)
 
   calls <- call_positives(combined_peaks, target_definitions, neg_sample_name)
 
@@ -148,7 +147,7 @@ get_version <- function() {
 }
 
 load_spectra <- function(results_path, verbose) {
-  paste("spectra path", results_path) %>% print()
+
     spectra <-
       if (verbose) {
         MALDIquantForeign::import(results_path)
@@ -195,7 +194,7 @@ load_definitions <- function(additional_path) {
 
   definitions <-
     definitions_files %>% map_dfr(~ read_tsv(.x, col_types = "cdd"))
-  print("derp")
+
   definitions
 }
 
@@ -305,7 +304,7 @@ get_intensity_table <- function(spectra, peaks, samples, incl_ranges) {
   intensity_table
 }
 
-combine_peaks_and_call_positives <- function(peaks, negative_sample_name) {
+combine_peaks_and_call_positives <- function(peaks, negative_sample_name, incl_ranges) {
 
   neg_idx <-
     peaks %>%
@@ -333,7 +332,7 @@ combine_peaks_and_call_positives <- function(peaks, negative_sample_name) {
         TRUE     ~ e / n
       ),
       is_positive = SNR > 3) %>%
-    as_tibble()
+    filter_mass_on_ranges(incl_ranges)
 
   colnames(merged) <- c("mass", experimental_sample_name,
                         negative_sample_name, "SNR", "is_positive")
