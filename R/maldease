@@ -51,7 +51,9 @@ arguments <- function() {
 
   Usage:
     maldease --input=<path> --negative-control=<path> --output=<path> --definitions=<tsv>... [options]
-    maldease (-h | --help)
+    maldease --generate-example-definitions
+    maldease -v | --version
+    maldease -h | --help
 
   Options:
     -h --help                            Print this help and exit
@@ -70,6 +72,8 @@ arguments <- function() {
                                          [default: 0-Inf]
     -d <tsv> --definitions=<tsv>         One or more paths to tab-separated
                                          defintions of target peaks
+    --generate-example-definitions       Generate an example definitions file
+                                         and write it to stdout
   "
 
   args <- docopt(doc, version = get_version())
@@ -78,6 +82,11 @@ arguments <- function() {
 
   # Make numeric arguments the correct type
   args[["--half-window-size"]] <- as.integer(args[["--half-window-size"]])
+
+  if (args[["--generate-example-definitions"]]) {
+    generate_example_definitions()
+    quit(save = "no", status = 0)
+  }
 
   args
 }
@@ -183,6 +192,18 @@ load_definitions <- function(definitions_files) {
   definitions
 }
 
+generate_example_definitions <- function() {
+  example_definitions <- tribble(
+    ~target, ~mass, ~mass_tolerance,
+    "BoNT-A", 999,  0.6,
+    "BoNT-A", 1203, 1,
+    "BoNT-A", 1427, 0.5,
+    "BoNT-A", 2406, 0.5
+  )
+
+  example_definitions %>% format_tsv() %>% cat()
+
+}
 
 preprocess_spectra <- function(spectra, half_window_size) {
   transformed_spectra <-
