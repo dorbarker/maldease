@@ -1,9 +1,9 @@
 #!/usr/bin/env Rscript
 
 for (pkg in c(
+  "docopt",
   "MALDIquant",
   "MALDIquantForeign",
-  "optparse",
   "magrittr",
   "readr",
   "purrr",
@@ -31,10 +31,8 @@ project_loc <-
     `[`(., 1:(length(.)-2)) %>%
     paste(collapse=.Platform$file.sep)
 
-setwd(project_loc)
-
-suppressMessages(here::i_am("R/maldease.R"))
-
+description_path <- file.path(project_loc, "DESCRIPTION")
+# suppressMessages(here::i_am("R/maldease.R"))
 arguments <- function() {
 
   parse_range <- function(range_str) {
@@ -49,81 +47,51 @@ arguments <- function() {
     parsed_ranges
   }
 
-  parser <-
-    OptionParser() %>%
-    add_option(c("-i", "--input"),
-               metavar = "DIRECTORY",
-               help = "Path to raw MALDI experimental results [required]") %>%
-    add_option(c("-n", "--negative-control"),
-               metavar = "DIRECTORY",
-               help = "Path to raw MALDI results for negative control") %>%
-    add_option(c("-o", "--output"),
-               metavar = "DIRECTORY",
-               help = "Path to output directory [required]") %>%
-    add_option(
-      "--half-window-size",
-      type = "integer",
-      default = 20,
-      metavar = "INT",
-      help = "Half-window size for smoothing interval [20]"
-    )  %>%
-    add_option(
-      "--include-only",
-      default = "0-Inf",
-      dest = "include_only_str",
-      type = "character",
-      metavar = "RANGES",
-      help = "Consider only these mass ranges for peak reporting. \
-              Lower and upper bounds are inclusive and separated by a dash. \
-              Multiple ranges can be specified and are commas-delimited. \
-              e.g. `--include-only '123-456,1000-2000'`"
-    ) %>%
-    add_option("--definitions",
-               type = "character",
-               metavar = "FILE",
-               help = "Path to additional definitions for peak calling") %>%
-    add_option(c("-v", "--version"),
-               action = "store_true",
-               default = FALSE,
-               help = "Print the version and exit")
+  doc <- "maldease
 
+  Usage:
+    maldease --input=<path> --negative-control=<path> --output=<path> --definitions=<tsv>... [options]
+    maldease (-h | --help)
 
-  args <- parse_args2(parser)
+  Options:
+    -h --help                            Print this help and exit
+    -v --version                         Print program version and exit
+    -i <path --input=<path>              Path to experimental MALDI results
+    -n <path> --negative-control=<path>  Path to negative control MALDI results
+    -o <path> --output=<path>            Output directory path
+    --half-window-size=<int>             Half-window size for smoothing and peak
+                                         detection [default: 20]
+    --include-only=<ranges>              Consider only these mass ranges for
+                                         peak reporting. Lower and upper bounds
+                                         are inclusive and separated by a dash.
+                                         Multiple ranges can be specified and
+                                         are comma delimited,
+                                         e.g.--include-only \'123-456,1000-2000\'
+                                         [default: 0-Inf]
+    -d <tsv> --definitions=<tsv>         One or more paths to tab-separated
+                                         defintions of target peaks
+  "
 
-  if (args$option$version) {
-    cat(paste("maldease", get_version()), "\n")
-    quit(save = "no", status = 0)
-  }
+  args <- docopt(doc, version = get_version())
 
-  args$options$include_only <- parse_range(args$options$include_only_str)
+  args[["--include-only"]] <- parse_range(args[["--include-only"]])
 
-  is_input_null <- is.null(args$options$input)
-  is_output_null <- is.null(args$options$output)
+  # Make numeric arguments the correct type
+  args[["--half-window-size"]] <- as.integer(args[["--half-window-size"]])
 
-  if (is_input_null || is_output_null) {
-    print_help(parser)
-
-    if (is_input_null) {
-      cat("Required argument `--input` was not provided.\n")
-    }
-    if (is_output_null) {
-      cat("Required argument `--output` was not provided.\n")
-    }
-    quit(save = "no", status = 1)
-  }
   args
 }
 
 main <- function() {
 
-  args <- arguments()$options
+  args <- arguments()
 
   analysis_time <- Sys.time()
   analysis_params <- format_analysis_parameters(args, analysis_time)
 
-  experiment_spectra <- load_spectra(args$input, FALSE)
+  experiment_spectra <- load_spectra(args[["--input"]], FALSE)
 
-  negative_spectra <- load_spectra(args$negative_control, FALSE)
+  negative_spectra <- load_spectra(args[["--negative-control"]], FALSE)
 
   neg_sample_name <-
     map_chr(negative_spectra, ~ metaData(.x)$sampleName) %>%
@@ -132,10 +100,10 @@ main <- function() {
   spectra <- c(experiment_spectra, negative_spectra)
 
 
-  target_definitions <- load_definitions(args$definitions)
+  target_definitions <- load_definitions(args[["--definitions"]])
 
   normalized_spectra <-
-    preprocess_spectra(spectra, args$half_window_size)
+    preprocess_spectra(spectra, args[["--half-window-size"]])
 
   samples_avgSpectra <-
     average_technical_replicates(normalized_spectra)
@@ -144,35 +112,41 @@ main <- function() {
   avg_spectra <- samples_avgSpectra$avg_spectra
 
   peaks_noise <-
-    peak_detection_spectra(avg_spectra, 3, args$half_window_size)
+    peak_detection_spectra(avg_spectra, 3, args[["--half-window-size"]])
 
   combined_peaks <- combine_peaks_and_call_positives(peaks_noise$peaks,
-                                                     neg_sample_name)
-  intensity_table <- get_intensity_table(avg_spectra,
-                                         peaks_noise$peaks,
-                                         samples,
-                                         args$include_only)
+                                                     neg_sample_name,
+                                                     args[["--include-only"]])
 
-  spectrum_plot <- draw_plots(avg_spectra, peaks_noise$peaks, args$include_only, analysis_time)
+  spectrum_plot <- draw_plots(avg_spectra,
+                              peaks_noise$peaks,
+                              args[["--include-only"]],
+                              analysis_time)
 
   calls <- call_positives(combined_peaks, target_definitions, neg_sample_name)
 
-  write_output(spectrum_plot, combined_peaks, analysis_params, calls, args$output)
+  write_output(spectrum_plot,
+               combined_peaks,
+               analysis_params,
+               calls,
+               args[["--output"]])
 
 }
 
 get_version <- function() {
   version <-
-    read_lines(here("DESCRIPTION")) %>%
+    read_lines(description_path) %>%
     keep(~ grepl("Version", .x)) %>%
     str_split(": ") %>%
     unlist() %>%
-    .[2]
+    .[2] %>%
+    paste("maldease", ., "\n")
 
   version
 }
 
 load_spectra <- function(results_path, verbose) {
+
     spectra <-
       if (verbose) {
         MALDIquantForeign::import(results_path)
@@ -209,12 +183,12 @@ load_definitions <- function(additional_path) {
   # name2,mass,mass_tolerance
   # etc
 
-  definitions_files <-
-    here("data") %>%
-    list.files(full.names = TRUE)
+  # definitions_files <-
+  #   here("data") %>%
+  #   list.files(full.names = TRUE)
 
   if (!is.null(additional_path)) {
-    definitions_files <- c(definitions_files, additional_path)
+    definitions_files <- additional_path
   }
 
   definitions <-
@@ -301,35 +275,7 @@ filter_mass_on_ranges <- function(mass_spec_table, incl_ranges) {
   map_dfr(incl_ranges, ~ filter(mass_spec_table, between(mass, .x[1], .x[2])))
 }
 
-get_intensity_table <- function(spectra, peaks, samples, incl_ranges) {
-  m <- intensityMatrix(peaks, spectra)
-  mz <- attr(m, "mass")
-
-  mass_snr <-
-    map_dfr(peaks,
-            ~ tibble(
-              sample = .x@metaData$sampleName,
-              mass = .x@mass,
-              snr = .x@snr
-            ))
-
-  intensity_table <-
-    t(m) %>%
-    as_tibble(.name_repair = "minimal") %>%
-    set_colnames(samples) %>%
-    mutate(mass = mz) %>%
-    pivot_longer(-mass,
-                 names_to = "sample",
-                 values_to = "intensity") %>%
-    left_join(mass_snr, by = c("mass", "sample")) %>%
-    mutate(noise = intensity / snr) %>%
-    drop_na() %>%
-    filter_mass_on_ranges(incl_ranges)
-
-  intensity_table
-}
-
-combine_peaks_and_call_positives <- function(peaks, negative_sample_name) {
+combine_peaks_and_call_positives <- function(peaks, negative_sample_name, incl_ranges) {
 
   neg_idx <-
     peaks %>%
@@ -357,7 +303,7 @@ combine_peaks_and_call_positives <- function(peaks, negative_sample_name) {
         TRUE     ~ e / n
       ),
       is_positive = SNR > 3) %>%
-    as_tibble()
+    filter_mass_on_ranges(incl_ranges)
 
   colnames(merged) <- c("mass", experimental_sample_name,
                         negative_sample_name, "SNR", "is_positive")
