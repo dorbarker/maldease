@@ -51,7 +51,7 @@ arguments <- function() {
   doc <- "maldease
 
   Usage:
-    maldease --input=<path> --negative-control=<path> --output=<path> [options]
+    maldease --input=<path> --negative-control=<path> --output=<path> --definitions=<tsv>... [options]
     maldease (-h | --help)
 
   Options:
@@ -69,7 +69,7 @@ arguments <- function() {
                                          are comma delimited,
                                          e.g.--include-only \'123-456,1000-2000\'
                                          [default: 0-Inf]
-    --definitions=<files>...             One or more paths to tab-separated
+    -d <tsv> --definitions=<tsv>         One or more paths to tab-separated
                                          defintions of target peaks
   "
 
