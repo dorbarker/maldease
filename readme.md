@@ -8,47 +8,34 @@ Maldease is a tool for rapidly processing [MALDI](https://en.wikipedia.org/wiki/
 maldease -i <path to directory of MALDI data> -o <output directory>
 ```
 
-One or more defintions files may be placed in `data/`. Maldease will use these files for calling the presence or absence of peaks. The definition files are tab-delimited.
+```
+maldease
 
-    target  mass    tolerance
-    BoNT-A  2406    0.5
-    BoNT-A  1203    1
-    BoNT-A  1427    0.5
-    BoNT-A  999 0.6
+  Usage:
+    maldease --input=<path> --negative-control=<path> --output=<path> --definitions=<tsv>... [options]
+    maldease --generate-example-definitions
+    maldease -v | --version
+    maldease -h | --help
 
-``` sh
-$ maldease --help
-
-Options:
-    -h, --help
-        Show this help message and exit
-
-    -i DIRECTORY, --input=DIRECTORY
-        Path to raw MALDI results [required]
-
-    -o DIRECTORY, --output=DIRECTORY
-        Path to output directory [required]
-
-    --min-mass=NUMBER
-        Minimum mass to include in analysis [0]
-
-    --max-mass=NUMBER
-        Maximum mass to include in analysis [Inf]
-
-    --half-window-size=INT
-        Half-window size for smoothing interval [20]
-
-    --include-only=RANGES
-        Consider only these mass ranges for peak reporting. 
-              Lower and upper bounds are inclusive and separated by a dash. 
-              Multiple ranges can be specified and are commas-delimited. 
-              e.g. `--include-only '123-456,1000-2000'`
-
-    --definitions=FILE
-        Path to additional definitions for peak calling
-
-    -v, --version
-        Print the version and exit
+  Options:
+    -h --help                            Print this help and exit
+    -v --version                         Print program version and exit
+    -i <path --input=<path>              Path to experimental MALDI results
+    -n <path> --negative-control=<path>  Path to negative control MALDI results
+    -o <path> --output=<path>            Output directory path
+    --half-window-size=<int>             Half-window size for smoothing and peak
+                                         detection [default: 20]
+    --include-only=<ranges>              Consider only these mass ranges for
+                                         peak reporting. Lower and upper bounds
+                                         are inclusive and separated by a dash.
+                                         Multiple ranges can be specified and
+                                         are comma delimited,
+                                         e.g.--include-only \'123-456,1000-2000\'
+                                         [default: 0-Inf]
+    -d <tsv> --definitions=<tsv>         One or more paths to tab-separated
+                                         defintions of target peaks
+    --generate-example-definitions       Generate an example definitions file
+                                         and write it to stdout
 ```
 
 # Data Citation
