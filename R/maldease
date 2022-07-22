@@ -192,8 +192,13 @@ load_definitions <- function(definitions_files) {
 }
 
 generate_example_definitions <- function() {
+
+  # the mass tolerances are illustrative only, and
+  # only intended to show a valid definition file
+  #
+  # you should use value appropriate to your purpose
   example_definitions <- tribble(
-    ~target, ~mass, ~mass_tolerance,
+    ~target, ~mass, ~tolerance,
     "BoNT-A", 999,  0.6,
     "BoNT-A", 1203, 1,
     "BoNT-A", 1427, 0.5,
