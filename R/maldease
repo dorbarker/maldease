@@ -112,6 +112,10 @@ main <- function() {
                        args[["output"]])
   }
 
+  # save analysis parameters
+  params_path <- file.path(args[["output"]], "params.txt")
+  write_lines(analysis_params, params_path)
+
 }
 
 process_experiment <- function(experiment_path,
@@ -125,9 +129,8 @@ process_experiment <- function(experiment_path,
 
   experiment_spectra <- load_spectra(experiment_path, FALSE)
 
-  neg_sample_name <-
-    map_chr(negative_spectra, ~ metaData(.x)$sampleName) %>%
-    unique()
+  neg_sample_name <- get_sample_name(negative_spectra)
+  experiment_sample_name <- get_sample_name(experiment_spectra)
 
   spectra <- c(experiment_spectra, negative_spectra)
 
@@ -156,8 +159,8 @@ process_experiment <- function(experiment_path,
 
   write_output(spectrum_plot,
                combined_peaks,
-               analysis_params,
                calls,
+               experiment_sample_name,
                output)
 
 }
@@ -172,6 +175,10 @@ get_version <- function() {
     paste("maldease", ., "\n")
 
   version
+}
+
+get_sample_name <- function(spectra) {
+  map_chr(spectra, ~ metaData(.x)$sampleName) %>% unique()
 }
 
 load_spectra <- function(results_path, verbose) {
@@ -408,16 +415,25 @@ call_positives <- function(intensity_table, target_definitions, negative_sample_
     select(target, mass, positive)
 }
 
-write_output <- function(spectrum_plot, intensity_table, params, calls, outpath) {
-  if (!dir.exists(outpath)) {
-    dir.create(outpath)
+write_output <- function(spectrum_plot,
+                         intensity_table,
+                         calls,
+                         experiment_sample_name,
+                         outpath) {
+
+  format_outpath <- partial(file.path, outpath, experiment_sample_name)
+  base_path <- format_outpath()
+
+  if (!dir.exists(base_path)) {
+    dir.create(base_path, recursive = TRUE)
   }
 
-  plot_path <- file.path(outpath, "mass_spectrum.png")
-  table_path <- file.path(outpath, "intensity_table.tsv")
-  excel_path <- file.path(outpath, "intensity_table.xlsx")
-  params_path <- file.path(outpath, "params.txt")
-  calls_path <- file.path(outpath, "calls.tsv")
+
+
+  plot_path <- format_outpath("mass_spectrum.png")
+  table_path <- format_outpath("intensity_table.tsv")
+  excel_path <- format_outpath("intensity_table.xlsx")
+  calls_path <- format_outpath("calls.tsv")
 
   ggsave(
     filename = plot_path,
@@ -430,7 +446,7 @@ write_output <- function(spectrum_plot, intensity_table, params, calls, outpath)
   write_tsv(intensity_table, table_path)
   write_tsv(calls, calls_path)
   write_xlsx(intensity_table, excel_path)
-  write_lines(params, params_path)
+
 }
 
 main()
