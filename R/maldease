@@ -49,7 +49,7 @@ arguments <- function() {
   doc <- "maldease
 
   Usage:
-    maldease --input=<path> --negative-control=<path> --output=<path> --definitions=<tsv>... [options]
+    maldease --negative-control=<path> --output=<path> --definitions=<tsv>... [options] <experiments>...
     maldease --generate-example-definitions
     maldease -v | --version
     maldease -h | --help
@@ -57,7 +57,6 @@ arguments <- function() {
   Options:
     -h --help                            Print this help and exit
     -v --version                         Print program version and exit
-    -i <path --input=<path>              Path to experimental MALDI results
     -n <path> --negative-control=<path>  Path to negative control MALDI results
     -o <path> --output=<path>            Output directory path
     --half-window-size=<int>             Half-window size for smoothing and peak
@@ -77,10 +76,10 @@ arguments <- function() {
 
   args <- docopt(doc, version = get_version())
 
-  args[["--include-only"]] <- parse_range(args[["--include-only"]])
+  args[["include_only"]] <- parse_range(args[["--include-only"]])
 
   # Make numeric arguments the correct type
-  args[["--half-window-size"]] <- as.integer(args[["--half-window-size"]])
+  args[["half_window_size"]] <- as.integer(args[["--half-window-size"]])
 
   if (args[["--generate-example-definitions"]]) {
     generate_example_definitions()
@@ -97,21 +96,52 @@ main <- function() {
   analysis_time <- Sys.time()
   analysis_params <- format_analysis_parameters(args, analysis_time)
 
-  experiment_spectra <- load_spectra(args[["--input"]], FALSE)
+  negative_spectra <- load_spectra(args[["negative_control"]], FALSE)
 
-  negative_spectra <- load_spectra(args[["--negative-control"]], FALSE)
+  target_definitions <- load_definitions(args[["definitions"]])
 
-  neg_sample_name <-
-    map_chr(negative_spectra, ~ metaData(.x)$sampleName) %>%
-    unique()
+  for (experiment_path in args[["experiments"]]) {
+
+    process_experiment(experiment_path,
+                       negative_spectra,
+                       target_definitions,
+                       args[["half_window_size"]],
+                       args[["include_only"]],
+                       analysis_time,
+                       analysis_params,
+                       args[["output"]])
+  }
+
+  # save analysis parameters
+  params_path <- file.path(args[["output"]], "params.txt")
+  write_lines(analysis_params, params_path)
+
+}
+
+process_experiment <- function(experiment_path,
+                               negative_spectra,
+                               target_definitions,
+                               half_window_size,
+                               include_only,
+                               analysis_time,
+                               analysis_params,
+                               output) {
+
+  experiment_spectra <- load_spectra(experiment_path, FALSE)
+
+  neg_sample_name <- get_sample_name(negative_spectra)
+  experiment_sample_name <- get_sample_name(experiment_spectra)
+
+  if (experiment_sample_name == neg_sample_name) {
+    # Facilitate globbing experiments at the CLI and skip
+    # comparing the negative control to itself
+    return()
+  }
 
   spectra <- c(experiment_spectra, negative_spectra)
 
-
-  target_definitions <- load_definitions(args[["--definitions"]])
-
   normalized_spectra <-
-    preprocess_spectra(spectra, args[["--half-window-size"]])
+    preprocess_spectra(spectra, half_window_size)
 
   samples_avgSpectra <-
     average_technical_replicates(normalized_spectra)
@@ -120,24 +150,25 @@ main <- function() {
   avg_spectra <- samples_avgSpectra$avg_spectra
 
   peaks_noise <-
-    peak_detection_spectra(avg_spectra, 3, args[["--half-window-size"]])
+    peak_detection_spectra(avg_spectra, 3, half_window_size)
 
   combined_peaks <- combine_peaks_and_call_positives(peaks_noise$peaks,
+                                                     experiment_sample_name,
                                                      neg_sample_name,
-                                                     args[["--include-only"]])
+                                                     include_only)
 
   spectrum_plot <- draw_plots(avg_spectra,
                               peaks_noise$peaks,
-                              args[["--include-only"]],
+                              include_only,
                               analysis_time)
 
   calls <- call_positives(combined_peaks, target_definitions, neg_sample_name)
 
   write_output(spectrum_plot,
                combined_peaks,
-               analysis_params,
                calls,
-               args[["--output"]])
+               experiment_sample_name,
+               output)
 
 }
 
@@ -151,6 +182,10 @@ get_version <- function() {
     paste("maldease", ., "\n")
 
   version
+}
+
+get_sample_name <- function(spectra) {
+  map_chr(spectra, ~ metaData(.x)$sampleName) %>% unique()
 }
 
 load_spectra <- function(results_path, verbose) {
@@ -287,14 +322,20 @@ filter_mass_on_ranges <- function(mass_spec_table, incl_ranges) {
   map_dfr(incl_ranges, ~ filter(mass_spec_table, between(mass, .x[1], .x[2])))
 }
 
-combine_peaks_and_call_positives <- function(peaks, negative_sample_name, incl_ranges) {
+combine_peaks_and_call_positives <- function(peaks,
+                                             experiment_sample_name,
+                                             negative_sample_name,
+                                             incl_ranges) {
 
   neg_idx <-
     peaks %>%
     map_lgl(~ metaData(.x)$sampleName == negative_sample_name) %>%
     which()
 
-  exp_idx <- if (neg_idx == 1) {2} else {1}
+  exp_idx <-
+    peaks %>%
+    map_lgl(~ metaData(.x)$sampleName == experiment_sample_name) %>%
+    which()
 
   n <- peaks[[neg_idx]]
   e <- peaks[[exp_idx]]
@@ -387,16 +428,25 @@ call_positives <- function(intensity_table, target_definitions, negative_sample_
     select(target, mass, positive)
 }
 
-write_output <- function(spectrum_plot, intensity_table, params, calls, outpath) {
-  if (!dir.exists(outpath)) {
-    dir.create(outpath)
+write_output <- function(spectrum_plot,
+                         intensity_table,
+                         calls,
+                         experiment_sample_name,
+                         outpath) {
+
+  format_outpath <- partial(file.path, outpath, experiment_sample_name)
+  base_path <- format_outpath()
+
+  if (!dir.exists(base_path)) {
+    dir.create(base_path, recursive = TRUE)
   }
 
-  plot_path <- file.path(outpath, "mass_spectrum.png")
-  table_path <- file.path(outpath, "intensity_table.tsv")
-  excel_path <- file.path(outpath, "intensity_table.xlsx")
-  params_path <- file.path(outpath, "params.txt")
-  calls_path <- file.path(outpath, "calls.tsv")
+
+
+  plot_path <- format_outpath("mass_spectrum.png")
+  table_path <- format_outpath("intensity_table.tsv")
+  excel_path <- format_outpath("intensity_table.xlsx")
+  calls_path <- format_outpath("calls.tsv")
 
   ggsave(
     filename = plot_path,
@@ -409,7 +459,7 @@ write_output <- function(spectrum_plot, intensity_table, params, calls, outpath)
   write_tsv(intensity_table, table_path)
   write_tsv(calls, calls_path)
   write_xlsx(intensity_table, excel_path)
-  write_lines(params, params_path)
+
 }
 
 main()
