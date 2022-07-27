@@ -132,6 +132,12 @@ process_experiment <- function(experiment_path,
   neg_sample_name <- get_sample_name(negative_spectra)
   experiment_sample_name <- get_sample_name(experiment_spectra)
 
+  if (experiment_sample_name == neg_sample_name) {
+    # Facilitate globbing experiments at the CLI and skip
+    # comparing the negative control to itself
+    return()
+  }
+
   spectra <- c(experiment_spectra, negative_spectra)
 
   normalized_spectra <-
@@ -147,6 +153,7 @@ process_experiment <- function(experiment_path,
     peak_detection_spectra(avg_spectra, 3, half_window_size)
 
   combined_peaks <- combine_peaks_and_call_positives(peaks_noise$peaks,
+                                                     experiment_sample_name,
                                                      neg_sample_name,
                                                      include_only)
 
@@ -315,14 +322,20 @@ filter_mass_on_ranges <- function(mass_spec_table, incl_ranges) {
   map_dfr(incl_ranges, ~ filter(mass_spec_table, between(mass, .x[1], .x[2])))
 }
 
-combine_peaks_and_call_positives <- function(peaks, negative_sample_name, incl_ranges) {
+combine_peaks_and_call_positives <- function(peaks,
+                                             experiment_sample_name,
+                                             negative_sample_name,
+                                             incl_ranges) {
 
   neg_idx <-
     peaks %>%
     map_lgl(~ metaData(.x)$sampleName == negative_sample_name) %>%
     which()
 
-  exp_idx <- if (neg_idx == 1) {2} else {1}
+  exp_idx <-
+    peaks %>%
+    map_lgl(~ metaData(.x)$sampleName == experiment_sample_name) %>%
+    which()
 
   n <- peaks[[neg_idx]]
   e <- peaks[[exp_idx]]
