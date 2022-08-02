@@ -49,7 +49,7 @@ arguments <- function() {
   doc <- "maldease
 
   Usage:
-    maldease --negative-control=<path> --output=<path> --definitions=<tsv>... [options] <experiments>...
+    maldease --negative-control=<path> --output=<path> --definitions=<tsv>... [--peaks-only|--include-only=<ranges>] [options] <experiments>...
     maldease --generate-example-definitions
     maldease -v | --version
     maldease -h | --help
@@ -68,6 +68,8 @@ arguments <- function() {
                                          are comma delimited,
                                          e.g.--include-only \'123-456,1000-2000\'
                                          [default: 0-Inf]
+    --peaks-only                         Only report peaks within the tolerance
+                                         specified by --definitions
     -d <tsv> --definitions=<tsv>         One or more paths to tab-separated
                                          defintions of target peaks
     --generate-example-definitions       Generate an example definitions file
@@ -75,6 +77,12 @@ arguments <- function() {
   "
 
   args <- docopt(doc, version = get_version())
+
+
+  if (args[["--include-only"]] != "0-Inf" && args[["--peaks-only"]]) {
+    cat("error: --peaks-only and --include-only are mutually exclusive\n")
+    quit(save = "no", status = 1)
+  }
 
   args[["include_only"]] <- parse_range(args[["--include-only"]])
 
