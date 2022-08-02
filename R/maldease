@@ -74,7 +74,9 @@ arguments <- function() {
                                          and write it to stdout
   "
 
-  args <- docopt(doc, version = get_version())
+  program_version <- get_version()
+  args <- docopt(doc, version = program_version)
+  args[["version"]] <- program_version
 
   args[["include_only"]] <- parse_range(args[["--include-only"]])
 
