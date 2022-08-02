@@ -34,22 +34,10 @@ description_path <- file.path(project_loc, "DESCRIPTION")
 
 arguments <- function() {
 
-  parse_range <- function(range_str) {
-
-    parsed_ranges <-
-      range_str %>%
-      str_split("\\s*,\\s*", simplify = TRUE) %>%
-      str_split("-") %>%
-      map(as.double) %>%
-      map(sort)
-
-    parsed_ranges
-  }
-
   doc <- "maldease
 
   Usage:
-    maldease --negative-control=<path> --output=<path> --definitions=<tsv>... [options] <experiments>...
+    maldease --negative-control=<path> --output=<path> --definitions=<tsv>... [--peaks-only|--include-only=<ranges>] [options] <experiments>...
     maldease --generate-example-definitions
     maldease -v | --version
     maldease -h | --help
@@ -68,6 +56,8 @@ arguments <- function() {
                                          are comma delimited,
                                          e.g.--include-only \'123-456,1000-2000\'
                                          [default: 0-Inf]
+    --peaks-only                         Only report peaks within the tolerance
+                                         specified by --definitions
     -d <tsv> --definitions=<tsv>         One or more paths to tab-separated
                                          defintions of target peaks
     --generate-example-definitions       Generate an example definitions file
@@ -78,7 +68,11 @@ arguments <- function() {
   args <- docopt(doc, version = program_version)
   args[["version"]] <- program_version
 
-  args[["include_only"]] <- parse_range(args[["--include-only"]])
+
+  if (args[["--include-only"]] != "0-Inf" && args[["--peaks-only"]]) {
+    cat("error: --peaks-only and --include-only are mutually exclusive\n")
+    quit(save = "no", status = 1)
+  }
 
   # Make numeric arguments the correct type
   args[["half_window_size"]] <- as.integer(args[["--half-window-size"]])
@@ -102,13 +96,19 @@ main <- function() {
 
   target_definitions <- load_definitions(args[["definitions"]])
 
+  selected_ranges <- if (args[["peaks_only"]]) {
+    target_definitions %>% calculate_ranges_from_definitions() %>% parse_range()
+  } else {
+    args[["include_only"]] %>% parse_range()
+  }
+
   for (experiment_path in args[["experiments"]]) {
 
     process_experiment(experiment_path,
                        negative_spectra,
                        target_definitions,
                        args[["half_window_size"]],
-                       args[["include_only"]],
+                       selected_ranges,
                        analysis_time,
                        analysis_params,
                        args[["output"]])
@@ -186,6 +186,18 @@ get_version <- function() {
   version
 }
 
+parse_range <- function(range_str) {
+
+  parsed_ranges <-
+    range_str %>%
+    str_split("\\s*,\\s*", simplify = TRUE) %>%
+    str_split("-") %>%
+    map(as.double) %>%
+    map(sort)
+
+  parsed_ranges
+}
+
 get_sample_name <- function(spectra) {
   map_chr(spectra, ~ metaData(.x)$sampleName) %>% unique()
 }
@@ -226,6 +238,18 @@ load_definitions <- function(definitions_files) {
     definitions_files %>% map_dfr(~ read_tsv(.x, col_types = "cdd"))
 
   definitions
+}
+
+calculate_ranges_from_definitions <- function(definitions) {
+  # returns a string so that parse_range() can be reused
+
+  peak_ranges_str <-
+    definitions %>%
+    transmute(range_str = str_glue("{mass-tolerance}-{mass+tolerance}")) %>%
+    pull(range_str) %>%
+    str_c(collapse = ",")
+
+  peak_ranges_str
 }
 
 generate_example_definitions <- function() {
