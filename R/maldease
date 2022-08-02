@@ -34,18 +34,6 @@ description_path <- file.path(project_loc, "DESCRIPTION")
 
 arguments <- function() {
 
-  parse_range <- function(range_str) {
-
-    parsed_ranges <-
-      range_str %>%
-      str_split("\\s*,\\s*", simplify = TRUE) %>%
-      str_split("-") %>%
-      map(as.double) %>%
-      map(sort)
-
-    parsed_ranges
-  }
-
   doc <- "maldease
 
   Usage:
@@ -84,8 +72,6 @@ arguments <- function() {
     quit(save = "no", status = 1)
   }
 
-  args[["include_only"]] <- parse_range(args[["--include-only"]])
-
   # Make numeric arguments the correct type
   args[["half_window_size"]] <- as.integer(args[["--half-window-size"]])
 
@@ -108,13 +94,19 @@ main <- function() {
 
   target_definitions <- load_definitions(args[["definitions"]])
 
+  selected_ranges <- if (args[["peaks_only"]]) {
+    target_definitions %>% calculate_ranges_from_definitions() %>% parse_range()
+  } else {
+    args[["include_only"]] %>% parse_range()
+  }
+
   for (experiment_path in args[["experiments"]]) {
 
     process_experiment(experiment_path,
                        negative_spectra,
                        target_definitions,
                        args[["half_window_size"]],
-                       args[["include_only"]],
+                       selected_ranges,
                        analysis_time,
                        analysis_params,
                        args[["output"]])
@@ -190,6 +182,18 @@ get_version <- function() {
     paste("maldease", ., "\n")
 
   version
+}
+
+parse_range <- function(range_str) {
+
+  parsed_ranges <-
+    range_str %>%
+    str_split("\\s*,\\s*", simplify = TRUE) %>%
+    str_split("-") %>%
+    map(as.double) %>%
+    map(sort)
+
+  parsed_ranges
 }
 
 get_sample_name <- function(spectra) {
