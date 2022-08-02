@@ -226,6 +226,18 @@ load_definitions <- function(definitions_files) {
   definitions
 }
 
+calculate_ranges_from_definitions <- function(definitions) {
+  # returns a string so that parse_range() can be reused
+
+  peak_ranges_str <-
+    definitions %>%
+    transmute(range_str = str_glue("{mass-tolerance}-{mass+tolerance}")) %>%
+    pull(range_str) %>%
+    str_c(collapse = ",")
+
+  peak_ranges_str
+}
+
 generate_example_definitions <- function() {
 
   # the mass tolerances are illustrative only, and
