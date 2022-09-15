@@ -159,12 +159,15 @@ process_experiment <- function(experiment_path,
                                                      neg_sample_name,
                                                      include_only)
 
+  calibrator_intensity <- get_calibrator_intensity(combined_peaks,
+                                                   target_definitions)
+
   spectrum_plot <- draw_plots(avg_spectra,
                               peaks_noise$peaks,
                               include_only,
                               analysis_time)
 
-  calls <- call_positives(combined_peaks, target_definitions, neg_sample_name)
+  calls <- call_positives(combined_peaks, target_definitions)
 
   write_output(spectrum_plot,
                combined_peaks,
@@ -235,7 +238,8 @@ load_spectra <- function(results_path, verbose) {
 load_definitions <- function(definitions_files) {
 
   definitions <-
-    definitions_files %>% map_dfr(~ read_tsv(.x, col_types = "cdd"))
+    definitions_files %>%
+    map_dfr(~ read_tsv(.x, col_types = "cdd"))
 
   definitions
 }
@@ -438,7 +442,29 @@ format_analysis_parameters <- function(arg, analysis_time) {
   analysis_parameters_log
 }
 
-call_positives <- function(intensity_table, target_definitions, negative_sample_name) {
+get_calibrator_intensity <- function(intensity_table, target_definitions) {
+
+    calibrator_positive <-
+      target_definitions %>%
+      filter(str_detect(target, "calibrator|control"))
+
+    calibrator_intensity <-
+      if (nrow(calibrator_positive) == 0) {
+        1
+      } else {
+
+        upper <- calibrator_positive$mass + calibrator_positive$tolerance
+        lower <- calibrator_positive$mass - calibrator_positive$tolerance
+
+        intensity_table %>%
+        filter(mass < upper, mass > lower) %>%
+        pull(SNR)
+      }
+
+    calibrator_intensity
+}
+
+call_positives <- function(intensity_table, target_definitions) {
 
   potential_peaks <- intensity_table %>% filter(is_positive)
 
