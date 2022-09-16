@@ -442,24 +442,30 @@ format_analysis_parameters <- function(arg, analysis_time) {
   analysis_parameters_log
 }
 
-get_calibrator_intensity <- function(intensity_table, target_definitions) {
+get_calibrator_intensity <- function(combined_peaks, target_definitions) {
 
     calibrator_positive <-
       target_definitions %>%
       filter(str_detect(target, "calibrator|control"))
 
+    if (nrow(calibrator_positive) == 0) {
+      return(1) # no calibrator, so everything is scaled by 1, i.e. no change
+    }
+    # implicit else clause
+
+    upper <- calibrator_positive$mass + calibrator_positive$tolerance
+    lower <- calibrator_positive$mass - calibrator_positive$tolerance
+
+    calibrator_combined_mass <-
+      combined_peaks %>%
+      filter(mass < upper, mass > lower) %>%
+      pull(mass)
+
     calibrator_intensity <-
-      if (nrow(calibrator_positive) == 0) {
-        1
-      } else {
-
-        upper <- calibrator_positive$mass + calibrator_positive$tolerance
-        lower <- calibrator_positive$mass - calibrator_positive$tolerance
-
-        intensity_table %>%
-        filter(mass < upper, mass > lower) %>%
-        pull(SNR)
-      }
+      data.frame(mass = combined_peaks$mass,
+                 intensity = combined_peaks[, 2]) %>% # experimental sample col
+      filter(mass == calibrator_combined_mass) %>%
+      pull(intensity)
 
     calibrator_intensity
 }
