@@ -162,12 +162,18 @@ process_experiment <- function(experiment_path,
   calibrator_intensity <- get_calibrator_intensity(combined_peaks,
                                                    target_definitions)
 
+  # adjust combined_peaks to define intensities relative to the calibrator
+  adjusted_combined_peaks <-
+    combined_peaks %>%
+    mutate(across(!c(mass, SNR, is_positive)) / calibrator_intensity)
+
   spectrum_plot <- draw_plots(avg_spectra,
                               peaks_noise$peaks,
+                              calibrator_intensity,
                               include_only,
                               analysis_time)
 
-  calls <- call_positives(combined_peaks, target_definitions)
+  calls <- call_positives(adjusted_combined_peaks, target_definitions)
 
   write_output(spectrum_plot,
                combined_peaks,
@@ -394,7 +400,7 @@ combine_peaks_and_call_positives <- function(peaks,
   merged
 }
 
-draw_plots <- function(spectra, peaks, incl_ranges, analysis_time) {
+draw_plots <- function(spectra, peaks, calibrator_intensity, incl_ranges, analysis_time) {
 
   peak_tables <-
     map_dfr(
@@ -402,7 +408,7 @@ draw_plots <- function(spectra, peaks, incl_ranges, analysis_time) {
       ~ tibble(
         sample = .x@metaData$sampleName,
         mass = .x@mass,
-        peak_intensity = .x@intensity
+        peak_intensity = .x@intensity / calibrator_intensity
       )
     ) %>%
     filter_mass_on_ranges(incl_ranges)
@@ -411,7 +417,7 @@ draw_plots <- function(spectra, peaks, incl_ranges, analysis_time) {
                               ~ tibble(
                                 sample = .y,
                                 mass = .x@mass,
-                                intensity = .x@intensity)
+                                intensity = .x@intensity / calibrator_intensity)
                               )
 
   p <-
