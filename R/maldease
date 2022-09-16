@@ -474,30 +474,30 @@ get_calibrator_intensity <- function(combined_peaks, target_definitions) {
 
   calibrator_names <- regex("calibrator|control", ignore_case = TRUE)
 
-    calibrator_positive <-
-      target_definitions %>%
-      filter(str_detect(target, calibrator_names))
+  calibrator_positive <-
+    target_definitions %>%
+    filter(str_detect(target, calibrator_names))
 
-    if (nrow(calibrator_positive) == 0) {
-      return(1) # no calibrator, so everything is scaled by 1, i.e. no change
-    }
-    # implicit else clause
+  if (nrow(calibrator_positive) == 0) {
+    return(1) # no calibrator, so everything is scaled by 1, i.e. no change
+  }
+  # implicit else clause
 
-    upper <- calibrator_positive$mass + calibrator_positive$tolerance
-    lower <- calibrator_positive$mass - calibrator_positive$tolerance
+  upper <- calibrator_positive$mass + calibrator_positive$tolerance
+  lower <- calibrator_positive$mass - calibrator_positive$tolerance
 
-    calibrator_combined_mass <-
-      combined_peaks %>%
-      filter(mass < upper, mass > lower) %>%
-      pull(mass)
+  calibrator_combined_mass <-
+    combined_peaks %>%
+    filter(mass < upper, mass > lower) %>%
+    pull(mass)
 
-    calibrator_intensity <-
-      data.frame(mass = combined_peaks$mass,
-                 intensity = combined_peaks[, 2]) %>% # experimental sample col
-      filter(mass == calibrator_combined_mass) %>%
-      pull(intensity)
+  calibrator_intensity <-
+    data.frame(mass = combined_peaks$mass,
+               intensity = combined_peaks[, 2]) %>% # experimental sample col
+    filter(mass == calibrator_combined_mass) %>%
+    pull(intensity)
 
-    calibrator_intensity
+  calibrator_intensity
 }
 
 call_positives <- function(intensity_table, target_definitions) {
