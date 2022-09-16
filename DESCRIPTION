@@ -1,7 +1,7 @@
 Package: maldease
 Type: Package
 Title: Command Line Analysis of MALDI-TOF Data
-Version: 2.2.0
+Version: 2.2.1
 Author: Dillon O.R. Barker
 Maintainer: Dillon O.R. Barker <dillon.barker@phac-aspc.gc.ca>
 Description: A command line tool for analysing MALDI-TOF data. Generates mass

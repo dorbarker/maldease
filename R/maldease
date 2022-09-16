@@ -472,9 +472,11 @@ format_analysis_parameters <- function(arg, analysis_time) {
 
 get_calibrator_intensity <- function(combined_peaks, target_definitions) {
 
+  calibrator_names <- regex("calibrator|control", ignore_case = TRUE)
+
     calibrator_positive <-
       target_definitions %>%
-      filter(str_detect(target, "calibrator|control"))
+      filter(str_detect(target, calibrator_names))
 
     if (nrow(calibrator_positive) == 0) {
       return(1) # no calibrator, so everything is scaled by 1, i.e. no change
