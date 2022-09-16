@@ -411,7 +411,8 @@ draw_plots <- function(spectra, peaks, calibrator_intensity, incl_ranges, analys
         peak_intensity = .x@intensity / calibrator_intensity
       )
     ) %>%
-    filter_mass_on_ranges(incl_ranges)
+    filter_mass_on_ranges(incl_ranges) %>%
+    mutate(is_calibrator = peak_intensity == 1.0)
 
   spectrum_tables <- imap_dfr(spectra,
                               ~ tibble(
@@ -424,10 +425,16 @@ draw_plots <- function(spectra, peaks, calibrator_intensity, incl_ranges, analys
     ggplot(spectrum_tables, aes(x = mass, y = intensity)) +
     geom_line() +
     geom_point(
-      data = peak_tables,
+      data = filter(peak_tables, !is_calibrator),
       aes(x = mass, y = peak_intensity),
       shape = 4,
       colour = "red"
+    ) +
+    geom_point(
+      data = filter(peak_tables, is_calibrator),
+      aes(x = mass, y = peak_intensity),
+      shape = 1,
+      colour = "blue"
     ) +
     labs(title = analysis_time) +
     facet_wrap( ~ sample,
