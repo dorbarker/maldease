@@ -114,6 +114,21 @@ main <- function() {
                        args[["output"]])
   }
 
+  # ugly hack to avoid changing function signatures
+  intensity_table_summary <-
+    list.files(args[["output"]],
+               full.names = TRUE,
+               recursive = TRUE,
+               pattern = "intensity_table.tsv") %>%
+    map(~read_tsv(.x, col_types = "ddddl")) %>%
+    map_dfr(~ pivot_longer(.x, c(-1, -3, -4, -5),
+                           names_to = "sample",
+                           values_to = "intensity")) %>%
+    relocate(mass, sample, intensity)
+
+  write_tsv(intensity_table_summary,
+            file.path(args[["output"]], "intensity_table_summary.tsv"))
+
   # save analysis parameters
   params_path <- file.path(args[["output"]], "params.txt")
   write_lines(analysis_params, params_path)
