@@ -191,7 +191,7 @@ process_experiment <- function(experiment_path,
   calls <- call_positives(adjusted_combined_peaks, target_definitions)
 
   write_output(spectrum_plot,
-               combined_peaks,
+               adjusted_combined_peaks,
                calls,
                experiment_sample_name,
                output)
@@ -493,7 +493,7 @@ get_calibrator_intensity <- function(combined_peaks, target_definitions) {
 
   calibrator_intensity <-
     data.frame(mass = combined_peaks$mass,
-               intensity = combined_peaks[, 2]) %>% # experimental sample col
+               intensity = combined_peaks[, 2]) %>% # experimental sample column
     filter(mass == calibrator_combined_mass) %>%
     pull(intensity)
 
