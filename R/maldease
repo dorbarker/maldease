@@ -186,6 +186,7 @@ process_experiment <- function(experiment_path,
                               peaks_noise$peaks,
                               calibrator_intensity,
                               include_only,
+                              neg_sample_name,
                               analysis_time)
 
   calls <- call_positives(adjusted_combined_peaks, target_definitions)
@@ -415,7 +416,7 @@ combine_peaks_and_call_positives <- function(peaks,
   merged
 }
 
-draw_plots <- function(spectra, peaks, calibrator_intensity, incl_ranges, analysis_time) {
+draw_plots <- function(spectra, peaks, calibrator_intensity, incl_ranges, negative_sample_name, analysis_time) {
 
   peak_tables <-
     map_dfr(
@@ -429,12 +430,19 @@ draw_plots <- function(spectra, peaks, calibrator_intensity, incl_ranges, analys
     filter_mass_on_ranges(incl_ranges) %>%
     mutate(is_calibrator = peak_intensity == 1.0)
 
+
   spectrum_tables <- imap_dfr(spectra,
                               ~ tibble(
                                 sample = .y,
                                 mass = .x@mass,
                                 intensity = .x@intensity / calibrator_intensity)
                               )
+
+  other_sample_name <-
+    spectrum_tables %>%
+    pull(sample) %>%
+    unique() %>%
+    keep(~`!=`(.x, negative_sample_name))
 
   p <-
     ggplot(spectrum_tables, aes(x = mass, y = intensity)) +
@@ -452,7 +460,8 @@ draw_plots <- function(spectra, peaks, calibrator_intensity, incl_ranges, analys
       colour = "blue"
     ) +
     labs(title = analysis_time) +
-    facet_wrap( ~ sample,
+    facet_wrap(~ factor(sample, levels = c(other_sample_name,
+                                           negative_sample_name)),
                 ncol = 1,
                 scales = "fixed") +
     theme_linedraw()
