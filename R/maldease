@@ -92,7 +92,7 @@ main <- function() {
   analysis_time <- Sys.time()
   analysis_params <- format_analysis_parameters(args, analysis_time)
 
-  negative_spectra <- load_spectra(args[["negative_control"]], FALSE)
+  negative_spectra <- load_spectra(args[["negative_control"]])
 
   target_definitions <- load_definitions(args[["definitions"]])
 
@@ -144,7 +144,7 @@ process_experiment <- function(experiment_path,
                                analysis_params,
                                output) {
 
-  experiment_spectra <- load_spectra(experiment_path, FALSE)
+  experiment_spectra <- load_spectra(experiment_path)
 
   neg_sample_name <- get_sample_name(negative_spectra)
   experiment_sample_name <- get_sample_name(experiment_spectra)
@@ -227,35 +227,33 @@ get_sample_name <- function(spectra) {
   map_chr(spectra, ~ metaData(.x)$sampleName) %>% unique()
 }
 
-load_spectra <- function(results_path, verbose) {
+load_spectra <- function(spectrum_path) {
 
-    spectra <-
-      if (verbose) {
-        MALDIquantForeign::import(results_path)
-      } else {
-        suppressWarnings({
-          MALDIquantForeign::import(results_path)
-        })
-      }
+  spectra <-
+    tryCatch(suppressWarnings(MALDIquantForeign::import(spectrum_path)),
+             error = function(e) {
+               msg <- "Error: Not a valid MALDI spectrum [{spectrum_path}]\n\n"
+               cat(str_glue(msg))
+               quit(save = "no", status = 1)
+             })
 
+  non_empty <-
+    spectra %>%
+    map_lgl(isEmpty) %>%
+    all() %>%
+    not()
 
-    non_empty <-
-      spectra %>%
-      map_lgl(isEmpty) %>%
-      all() %>%
-      not()
+  regular <-
+    spectra %>%
+    map_lgl(isRegular)
 
-    regular <-
-      spectra %>%
-      map_lgl(isRegular)
-
-    if ((!non_empty) && regular) {
-      cat("Input data are malformed\n")
-      quit(save = "no", status = 1)
-    }
-
-    spectra
+  if ((!non_empty) && regular) {
+    cat(str_glue("Input data in [{spectrum_path}] are malformed\n\n"))
+    quit(save = "no", status = 1)
   }
+
+  spectra
+}
 
 load_definitions <- function(definitions_files) {
 
@@ -297,9 +295,9 @@ generate_example_definitions <- function() {
 }
 
 preprocess_spectra <- function(spectra, half_window_size) {
+
   transformed_spectra <-
     spectra %>%
-    # transformIntensity(method = "sqrt") %>%
     suppressWarnings({
       smoothIntensity(., method = "SavitzkyGolay",
                       halfWindowSize = half_window_size)
@@ -325,16 +323,20 @@ preprocess_spectra <- function(spectra, half_window_size) {
 }
 
 average_technical_replicates <- function(spectra) {
+
   samples <-
     factor(map_chr(spectra, function(x) {
       metaData(x)$sampleName
     }))
 
   avg_spectra <-
-    averageMassSpectra(spectra, labels = samples, method = "mean")
+    averageMassSpectra(spectra,
+                       labels = samples,
+                       method = "mean",
+                       mergeMetaData = FALSE)
 
   list(
-    "sample_names" = map_chr(avg_spectra, ~ metaData(.x)$sampleName),
+    "sample_names" = samples,
     "avg_spectra" = avg_spectra
   )
 }
@@ -366,6 +368,9 @@ peak_detection_spectra <- function(spectra,
       binPeaks(tolerance = 0.002) %>%
       filterPeaks(minFrequency = 0.25)
 
+    names(peaks) <- names(spectra)
+    names(noises) <- names(spectra)
+
     list("noise" = noises, "peaks" = peaks)
   }
 
@@ -381,18 +386,18 @@ combine_peaks_and_call_positives <- function(peaks,
 
   neg_idx <-
     peaks %>%
-    map_lgl(~ metaData(.x)$sampleName == negative_sample_name) %>%
+    imap_lgl(~ .y == negative_sample_name) %>%
     which()
 
   exp_idx <-
     peaks %>%
-    map_lgl(~ metaData(.x)$sampleName == experiment_sample_name) %>%
+    imap_lgl(~ .y == experiment_sample_name) %>%
     which()
 
   n <- peaks[[neg_idx]]
   e <- peaks[[exp_idx]]
 
-  experimental_sample_name <- metaData(e)$sampleName
+  experimental_sample_name <- names(peaks)[exp_idx]
 
   merged <-
     data.frame("mass" = e@mass, e = e@intensity) %>%
