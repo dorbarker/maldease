@@ -145,7 +145,7 @@ process_experiment <- function(experiment_path,
                                output) {
 
   experiment_spectra <- load_spectra(experiment_path, FALSE)
-  print(experiment_path)
+
   neg_sample_name <- get_sample_name(negative_spectra)
   experiment_sample_name <- get_sample_name(experiment_spectra)
 
@@ -173,7 +173,7 @@ process_experiment <- function(experiment_path,
                                                      experiment_sample_name,
                                                      neg_sample_name,
                                                      include_only)
-  print("here")
+
   calibrator_intensity <- get_calibrator_intensity(combined_peaks,
                                                    target_definitions)
 
@@ -385,7 +385,7 @@ combine_peaks_and_call_positives <- function(peaks,
                                              experiment_sample_name,
                                              negative_sample_name,
                                              incl_ranges) {
-  print(peaks)
+
   neg_idx <-
     peaks %>%
     imap_lgl(~ .y == negative_sample_name) %>%
