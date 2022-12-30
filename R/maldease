@@ -248,7 +248,7 @@ load_spectra <- function(spectrum_path) {
     map_lgl(isRegular)
 
   if ((!non_empty) && regular) {
-    cat("Input data are malformed\n")
+    cat(str_glue("Input data in [{spectrum_path}] are malformed\n\n"))
     quit(save = "no", status = 1)
   }
 
