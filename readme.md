@@ -5,37 +5,36 @@ Maldease is a tool for rapidly processing [MALDI](https://en.wikipedia.org/wiki/
 # Basic Usage
 
 ``` sh
-maldease -i <path to directory of MALDI data> -o <output directory>
+maldease --negative-control=<path> --output=<path> --definitions=<tsv> <experiments>...
 ```
 
 ```
-maldease
+Usage:
+  maldease --negative-control=<path> --output=<path> --definitions=<tsv>... [--peaks-only|--include-only=<ranges>] [options] <experiments>...
+  maldease --generate-example-definitions
+  maldease -v | --version
+  maldease -h | --help
 
-  Usage:
-    maldease --input=<path> --negative-control=<path> --output=<path> --definitions=<tsv>... [options]
-    maldease --generate-example-definitions
-    maldease -v | --version
-    maldease -h | --help
-
-  Options:
-    -h --help                            Print this help and exit
-    -v --version                         Print program version and exit
-    -i <path --input=<path>              Path to experimental MALDI results
-    -n <path> --negative-control=<path>  Path to negative control MALDI results
-    -o <path> --output=<path>            Output directory path
-    --half-window-size=<int>             Half-window size for smoothing and peak
-                                         detection [default: 20]
-    --include-only=<ranges>              Consider only these mass ranges for
-                                         peak reporting. Lower and upper bounds
-                                         are inclusive and separated by a dash.
-                                         Multiple ranges can be specified and
-                                         are comma delimited,
-                                         e.g.--include-only \'123-456,1000-2000\'
-                                         [default: 0-Inf]
-    -d <tsv> --definitions=<tsv>         One or more paths to tab-separated
-                                         defintions of target peaks
-    --generate-example-definitions       Generate an example definitions file
-                                         and write it to stdout
+Options:
+  -h --help                            Print this help and exit
+  -v --version                         Print program version and exit
+  -n <path> --negative-control=<path>  Path to negative control MALDI results
+  -o <path> --output=<path>            Output directory path
+  --half-window-size=<int>             Half-window size for smoothing and peak
+                                       detection [default: 20]
+  --include-only=<ranges>              Consider only these mass ranges for
+                                       peak reporting. Lower and upper bounds
+                                       are inclusive and separated by a dash.
+                                       Multiple ranges can be specified and
+                                       are comma delimited,
+                                       e.g.--include-only '123-456,1000-2000'
+                                       [default: 0-Inf]
+  --peaks-only                         Only report peaks within the tolerance
+                                       specified by --definitions
+  -d <tsv> --definitions=<tsv>         One or more paths to tab-separated
+                                       defintions of target peaks
+  --generate-example-definitions       Generate an example definitions file
+                                       and write it to stdout 
 ```
 
 # Data Citation
