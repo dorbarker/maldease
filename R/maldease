@@ -237,23 +237,23 @@ load_spectra <- function(spectrum_path) {
                quit(save = "no", status = 1)
              })
 
-    non_empty <-
-      spectra %>%
-      map_lgl(isEmpty) %>%
-      all() %>%
-      not()
+  non_empty <-
+    spectra %>%
+    map_lgl(isEmpty) %>%
+    all() %>%
+    not()
 
-    regular <-
-      spectra %>%
-      map_lgl(isRegular)
+  regular <-
+    spectra %>%
+    map_lgl(isRegular)
 
-    if ((!non_empty) && regular) {
-      cat("Input data are malformed\n")
-      quit(save = "no", status = 1)
-    }
-
-    spectra
+  if ((!non_empty) && regular) {
+    cat("Input data are malformed\n")
+    quit(save = "no", status = 1)
   }
+
+  spectra
+}
 
 load_definitions <- function(definitions_files) {
 
